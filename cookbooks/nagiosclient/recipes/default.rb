@@ -1,0 +1,215 @@
+#
+# Cookbook Name:: nagiosclient
+# Recipe:: default
+#
+# Copyright 2016, YOUR_COMPANY_NAME
+#
+# All rights reserved - Do Not Redistribute
+#
+
+# Nagios User & Group
+
+group 'nagios' do
+  action :create
+  gid 1020
+end
+
+user 'nagios' do
+  action :create
+  uid 1020
+  gid 1020
+  shell '/sbin/nologin'
+end
+
+
+# Pre-requisites
+
+packages=[
+  'build-essential',
+  'libgd2-xpm-dev',
+  'openssl',
+  'libssl-dev',
+  'xinetd',
+  'apache2-utils',
+  'unzip',
+  'xinetd',
+  'ksh',
+  'sysstat'
+]
+
+packages.each do |pack|
+  apt_package pack do
+    action :install
+  end
+end
+
+
+# Nagios Plugin
+
+remote_file '/opt/nagios-plugins-2.1.1.tar.gz' do
+  source 'http://www.nagios-plugins.org/download/nagios-plugins-2.1.1.tar.gz'
+  mode '0777'
+  action :create
+end
+
+execute 'plugin extract' do
+  command 'tar xzvf nagios-plugins-2.1.1.tar.gz'
+  cwd '/opt'
+  action :run
+end
+
+#tar_package 'http://www.nagios-plugins.org/download/nagios-plugins-2.1.1.tar.gz' do
+#  prefix '/opt/'
+#  not_if { File.exists?("/var/chef/cache/nagios-plugins-2.1.1.tar.gz") }
+#end
+
+execute './configure' do
+  command './configure'
+  cwd '/opt/nagios-plugins-2.1.1/'
+  action :run
+end
+
+execute 'make' do
+  command 'make'
+  cwd '/opt/nagios-plugins-2.1.1/'
+  action :run
+end
+
+execute 'make install' do
+  command 'make install'
+  cwd '/opt/nagios-plugins-2.1.1/'
+  action :run
+end
+
+
+# NRPE
+
+remote_file '/opt/nrpe-2.15.tar.gz' do
+  source 'http://sourceforge.net/projects/nagios/files/nrpe-2.x/nrpe-2.15/nrpe-2.15.tar.gz'
+  mode '0777'
+  action :create
+end
+
+execute 'nrpe extract' do
+  command 'tar xzvf nrpe-2.15.tar.gz'
+  cwd '/opt'
+  action :run
+end
+
+#tar_package 'http://sourceforge.net/projects/nagios/files/nrpe-2.x/nrpe-2.15/nrpe-2.15.tar.gz' do
+#  prefix '/opt/'
+#  not_if { File.exists?("/var/chef/cache/nrpe-2.15.tar.gz") }
+#end
+
+execute './configure' do
+  command './configure --with-ssl=/usr/bin/openssl --with-ssl-lib=/usr/lib/x86_64-linux-gnu'
+  cwd '/opt/nrpe-2.15/'
+  action :run
+end
+
+execute 'make' do
+  command 'make'
+  cwd '/opt/nrpe-2.15/'
+  action :run
+end
+
+execute 'make install-plugin' do
+  command 'make install-plugin'
+  cwd '/opt/nrpe-2.15/'
+  action :run
+end
+
+execute 'make install-daemon' do
+  command 'make install-daemon'
+  cwd '/opt/nrpe-2.15/'
+  action :run
+end
+
+execute 'make install-daemon-config' do
+  command 'make install-daemon-config'
+  cwd '/opt/nrpe-2.15/'
+  action :run
+end
+
+execute 'make install-xinetd' do
+  command 'make install-xinetd'
+  cwd '/opt/nrpe-2.15/'
+  action :run
+end
+
+
+# NRPE Service 
+
+template '/etc/xinetd.d/nrpe' do
+  source 'xinetdnrpe.erb'
+  owner 'root'
+  group 'root'
+  mode '0644'
+end
+
+ruby_block 'insert_service' do
+  block do
+    file = Chef::Util::FileEdit.new("/etc/services")
+    file.insert_line_if_no_match("nrpe", "nrpe          5666/tcp    #NRPE")
+    file.write_file
+  end
+end
+
+service 'xinetd' do
+  action :restart
+end
+
+
+# Plugins Transfer
+
+cookbook_file '/usr/local/nagios/libexec/check_cpu_stats.sh' do
+  source 'check_cpu_stats.sh'
+  owner 'nagios'
+  group 'nagios'
+  mode '0755' 
+  action :create
+end
+
+cookbook_file '/usr/local/nagios/libexec/check_mem' do
+  source 'check_mem'
+  owner 'nagios'
+  group 'nagios'
+  mode '0755' 
+  action :create
+end
+
+cookbook_file '/usr/local/nagios/libexec/check_port.pl' do
+  source 'check_port.pl'
+  owner 'nagios'
+  group 'nagios'
+  mode '0755' 
+  action :create
+end
+
+
+# Ownership Change
+
+directory '/usr/local/nagios/' do
+  owner 'nagios'
+  group 'nagios'
+  recursive true
+end
+
+
+# NRPE Checks
+
+template '/usr/local/nagios/etc/nrpe.cfg' do
+  source 'nrpe.erb'
+  owner 'nagios'
+  group 'nagios'
+  mode '0644'
+end
+
+service 'xinetd' do
+  action [:enable, :restart]
+end
+
+
+
+
+
