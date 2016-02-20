@@ -30,6 +30,7 @@ end
 directory '/usr/lib/nagios/plugins/' do
   owner 'nagios'
   group 'nagios'
+  mode '0755'
   recursive true
 end
 
