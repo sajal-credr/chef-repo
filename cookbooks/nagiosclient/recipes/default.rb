@@ -75,5 +75,5 @@ end
 
 service 'nagios-nrpe-server' do
   supports :status => true, :restart => true, :reload => true
-  action [ :enable, :sxtart ]
+  action [ :enable, :start ]
 end
